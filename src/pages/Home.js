@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, IconButton, Modal, Typography, Box, TextField, Button } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Typography, Button, Box } from '@mui/material';
 import { styled } from '@mui/system';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
+import { CSVLink } from 'react-csv'; // CSV indirme işlemi için react-csv'i kullanıyoruz
+import api from '../api/api';
 
 const TableContainerStyled = styled(TableContainer)({
   margin: 'auto',
@@ -11,111 +11,85 @@ const TableContainerStyled = styled(TableContainer)({
   textAlign: 'center',
 });
 
-const TableHeadStyled = styled(TableHead)({
-  backgroundColor: '#f5f5f5',
-});
-
-const TableCellStyled = styled(TableCell)({
-  fontWeight: 'bold',
-});
-
-const IconButtonStyled = styled(IconButton)({
-  margin: '0 5px',
-});
-
-const HeaderStyled = styled('div')({
-  textAlign: 'center',
-  margin: '20px 0',
-});
-
-const modalStyle = {
-  position: 'absolute',
-  top: '50%',
-  left: '50%',
-  transform: 'translate(-50%, -50%)',
-  width: 400,
-  backgroundColor: 'white',
-  border: '2px solid #000',
-  boxShadow: 24,
-  p: 4,
+const formatDate = (dateString) => {
+  const date = new Date(dateString);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
 };
 
 const Home = () => {
-  const [open, setOpen] = useState(false);
-  const [selectedRow, setSelectedRow] = useState(null);
-  const [data, setData] = useState([
-    {
-      telegram_id: 123456,
-      username: 'john_doe',
-      first_name: 'John',
-      last_name: 'Doe',
-      referral_code: 'REF123',
-      referred_by: 654321,
-      token: 10.5,
-      ref_earning: 2.5,
-      ticket: 3,
-      ref_earning_claim_date: '2024-08-04',
-    },
-    {
-      telegram_id: 789012,
-      username: 'jane_smith',
-      first_name: 'Jane',
-      last_name: 'Smith',
-      referral_code: 'REF456',
-      referred_by: 654322,
-      token: 15.0,
-      ref_earning: 3.0,
-      ticket: 5,
-      ref_earning_claim_date: '2024-08-05',
-    },
-  ]);
+  const [data, setData] = useState([]);
 
-  const handleOpen = (row) => {
-    setSelectedRow(row);
-    setOpen(true);
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const response = await api.get('/admin/users');
+      setData(response.data);
+    } catch (error) {
+      console.error('Veriler çekilirken bir hata oluştu:', error);
+    }
   };
 
-  const handleClose = () => {
-    setOpen(false);
-    setSelectedRow(null);
-  };
+  // CSV başlıkları ve verileri ayarlıyoruz
+  const csvHeaders = [
+    { label: "Telegram ID", key: "telegram_id" },
+    { label: "Kullanıcı Adı", key: "username" },
+    { label: "Ad", key: "first_name" },
+    { label: "Soyad", key: "last_name" },
+    { label: "Referral Kodu", key: "referral_code" },
+    { label: "Referans Olan", key: "referred_by" },
+    { label: "Token", key: "token" },
+    { label: "Referans Kazanç", key: "ref_earning" },
+    { label: "Bilet", key: "ticket" },
+    { label: "Kazanç Talep Tarihi", key: "ref_earning_claim_date" },
+  ];
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setSelectedRow((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleSave = () => {
-    setData((prevData) =>
-      prevData.map((row) =>
-        row.telegram_id === selectedRow.telegram_id ? selectedRow : row
-      )
-    );
-    handleClose();
-  };
+  const csvData = data.map((row) => ({
+    telegram_id: row.telegram_id,
+    username: row.username,
+    first_name: row.first_name,
+    last_name: row.last_name,
+    referral_code: row.referral_code,
+    referred_by: row.referred_by,
+    token: row.token,
+    ref_earning: row.ref_earning,
+    ticket: row.ticket,
+    ref_earning_claim_date: formatDate(row.ref_earning_claim_date),
+  }));
 
   return (
     <>
-      <HeaderStyled>
-        <Typography variant="h4">Users</Typography>
-      </HeaderStyled>
+      <Typography variant="h4" textAlign="center" margin="20px 0">
+        Kullanıcılar
+      </Typography>
+      <Box display="flex" justifyContent="center" marginBottom={2}>
+        <CSVLink data={csvData} headers={csvHeaders} filename={"kullanici_verileri.csv"}>
+          <Button variant="contained" color="primary">
+            CSV Olarak İndir
+          </Button>
+        </CSVLink>
+      </Box>
       <TableContainerStyled component={Paper}>
         <Table>
-          <TableHeadStyled>
+          <TableHead>
             <TableRow>
-              <TableCellStyled>Telegram ID</TableCellStyled>
-              <TableCellStyled>Username</TableCellStyled>
-              <TableCellStyled>First Name</TableCellStyled>
-              <TableCellStyled>Last Name</TableCellStyled>
-              <TableCellStyled>Referral Code</TableCellStyled>
-              <TableCellStyled>Referred By</TableCellStyled>
-              <TableCellStyled>Token</TableCellStyled>
-              <TableCellStyled>Ref Earning</TableCellStyled>
-              <TableCellStyled>Ticket</TableCellStyled>
-              <TableCellStyled>Ref Earning Claim Date</TableCellStyled>
-              <TableCellStyled>Actions</TableCellStyled>
+              <TableCell>Telegram ID</TableCell>
+              <TableCell>Kullanıcı Adı</TableCell>
+              <TableCell>Ad</TableCell>
+              <TableCell>Soyad</TableCell>
+              <TableCell>Referral Kodu</TableCell>
+              <TableCell>Referans Olan</TableCell>
+              <TableCell>Token</TableCell>
+              <TableCell>Referans Kazanç</TableCell>
+              <TableCell>Bilet</TableCell>
+              <TableCell>Kazanç Talep Tarihi</TableCell>
             </TableRow>
-          </TableHeadStyled>
+          </TableHead>
           <TableBody>
             {data.map((row, index) => (
               <TableRow key={index}>
@@ -128,74 +102,12 @@ const Home = () => {
                 <TableCell>{row.token}</TableCell>
                 <TableCell>{row.ref_earning}</TableCell>
                 <TableCell>{row.ticket}</TableCell>
-                <TableCell>{row.ref_earning_claim_date}</TableCell>
-                <TableCell>
-                  <IconButtonStyled aria-label="edit" onClick={() => handleOpen(row)}>
-                    <EditIcon />
-                  </IconButtonStyled>
-                  <IconButtonStyled aria-label="delete">
-                    <DeleteIcon />
-                  </IconButtonStyled>
-                </TableCell>
+                <TableCell>{formatDate(row.ref_earning_claim_date)}</TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </TableContainerStyled>
-
-      <Modal open={open} onClose={handleClose}>
-        <Box sx={modalStyle}>
-          <Typography variant="h6" component="h2">
-            Edit User
-          </Typography>
-          {selectedRow && (
-            <div>
-              <TextField
-                margin="normal"
-                fullWidth
-                label="Token"
-                name="token"
-                type="number"
-                value={selectedRow.token}
-                onChange={handleChange}
-              />
-              <TextField
-                margin="normal"
-                fullWidth
-                label="Ref Earning"
-                name="ref_earning"
-                type="number"
-                value={selectedRow.ref_earning}
-                onChange={handleChange}
-              />
-              <TextField
-                margin="normal"
-                fullWidth
-                label="Ticket"
-                name="ticket"
-                type="number"
-                value={selectedRow.ticket}
-                onChange={handleChange}
-              />
-              <TextField
-                margin="normal"
-                fullWidth
-                label="Ref Earning Claim Date"
-                name="ref_earning_claim_date"
-                type="date"
-                value={selectedRow.ref_earning_claim_date}
-                onChange={handleChange}
-                InputLabelProps={{
-                  shrink: true,
-                }}
-              />
-              <Button onClick={handleSave} variant="contained" color="primary" sx={{ mt: 2 }}>
-                Save
-              </Button>
-            </div>
-          )}
-        </Box>
-      </Modal>
     </>
   );
 };

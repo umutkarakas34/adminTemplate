@@ -1,9 +1,25 @@
-import React, { useState } from 'react';
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, IconButton, Modal, Typography, Box, TextField, Button, Grid } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  IconButton,
+  Typography,
+  Box,
+  TextField,
+  Button,
+  Modal,
+  Input
+} from '@mui/material';
 import { styled } from '@mui/system';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import api from '../api/api';
 
 const TableContainerStyled = styled(TableContainer)({
   margin: 'auto',
@@ -44,25 +60,26 @@ const modalStyle = {
 const Task = () => {
   const [open, setOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
-  const [data, setData] = useState([
-    {
-      task_title: 'Task 1',
-      task_image: 'image1.jpg',
-      task_description: 'Description for task 1',
-      task_link: 'http://example.com',
-      task_reward: 50,
-    },
-    {
-      task_title: 'Task 2',
-      task_image: 'image2.jpg',
-      task_description: 'Description for task 2',
-      task_link: 'http://example2.com',
-      task_reward: 100,
-    },
-  ]);
+  const [data, setData] = useState([]);
+  const [taskImages, setTaskImages] = useState([]);
+
+  // Görevleri listeleme
+  useEffect(() => {
+    fetchTasks();
+  }, []);
+
+  const fetchTasks = async () => {
+    try {
+      const response = await api.get('admin/tasks');
+      setData(response.data);
+    } catch (error) {
+      console.error('Görevler yüklenirken bir hata oluştu:', error);
+    }
+  };
 
   const handleOpen = (task) => {
     setSelectedTask(task);
+    setTaskImages([]);
     setOpen(true);
   };
 
@@ -76,58 +93,101 @@ const Task = () => {
     setSelectedTask((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSave = () => {
-    if (selectedTask) {
-      setData((prevData) =>
-        prevData.map((task) =>
-          task.task_title === selectedTask.task_title ? selectedTask : task
-        )
-      );
-    } else {
-      // Yeni bir görev ekleme
-      setData((prevData) => [
-        ...prevData,
-        {
-          task_title: '',
-          task_image: '',
-          task_description: '',
-          task_link: '',
-          task_reward: '',
-        },
-      ]);
+  const handleImageChange = (e) => {
+    setTaskImages(e.target.files);
+  };
+
+  const handleSave = async () => {
+    try {
+      if (selectedTask?.id) {
+        // Güncelleme için PUT isteği
+        await api.put(`admin/tasks/${selectedTask.id}`, {
+          task_title: selectedTask.task_title,
+          task_description: selectedTask.task_description,
+          task_reward: selectedTask.task_reward,
+          task_link: selectedTask.task_link,
+        });
+        console.log("calıstı");
+      } else {
+        // Yeni görev ekleme işlemi için POST isteği
+        const formData = new FormData();
+        formData.append('task_title', selectedTask?.task_title);
+        formData.append('task_description', selectedTask?.task_description);
+        formData.append('task_reward', selectedTask?.task_reward);
+        formData.append('task_link', selectedTask?.task_link);
+  
+        for (let i = 0; i < taskImages.length; i++) {
+          formData.append('task_images', taskImages[i]);
+        }
+  
+        await api.post('/admin/create-task', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+      }
+  
+      fetchTasks(); // Görevleri güncelle
+      handleClose(); // Modalı kapat
+    } catch (error) {
+      console.error('Görev kaydedilirken bir hata oluştu:', error);
     }
-    handleClose();
+  };
+  
+  
+
+  const handleDelete = async (id) => {
+    try {
+      await api.delete(`admin/tasks/${id}`);
+      fetchTasks();
+    } catch (error) {
+      console.error('Görev silinirken bir hata oluştu:', error);
+    }
   };
 
   return (
     <>
       <HeaderStyled>
-        <Typography variant="h4">Tasks</Typography>
+        <Typography variant="h4">Görevler</Typography>
       </HeaderStyled>
+      <Box display="flex" justifyContent="center" marginBottom={2}>
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<AddIcon />}
+          onClick={() => handleOpen({ task_title: '', task_description: '', task_link: '', task_reward: 0 })}
+        >
+          Yeni Görev Ekle
+        </Button>
+      </Box>
       <TableContainerStyled component={Paper}>
-        <Grid container justifyContent="space-between" alignItems="center">
-          <Grid item>
-            <IconButtonStyled aria-label="add" onClick={() => handleOpen(null)}>
-              <AddIcon />
-            </IconButtonStyled>
-          </Grid>
-        </Grid>
         <Table>
           <TableHeadStyled>
             <TableRow>
-              <TableCellStyled>Task Title</TableCellStyled>
-              <TableCellStyled>Task Image</TableCellStyled>
-              <TableCellStyled>Task Description</TableCellStyled>
-              <TableCellStyled>Task Link</TableCellStyled>
-              <TableCellStyled>Task Reward</TableCellStyled>
-              <TableCellStyled>Actions</TableCellStyled>
+              <TableCellStyled>Görev Başlığı</TableCellStyled>
+              <TableCellStyled>Görev Resmi</TableCellStyled>
+              <TableCellStyled>Görev Açıklaması</TableCellStyled>
+              <TableCellStyled>Görev Bağlantısı</TableCellStyled>
+              <TableCellStyled>Görev Ödülü</TableCellStyled>
+              <TableCellStyled>İşlemler</TableCellStyled>
             </TableRow>
           </TableHeadStyled>
           <TableBody>
             {data.map((task, index) => (
               <TableRow key={index}>
                 <TableCell>{task.task_title}</TableCell>
-                <TableCell>{task.task_image}</TableCell>
+                <TableCell>
+  {task.task_image ? (
+    <img 
+      src={task.task_image} 
+      alt="Task Image" 
+      style={{ width: '50px', height: '50px', objectFit: 'cover' }} 
+    />
+  ) : (
+    'Resim Yok'
+  )}
+</TableCell>
+
                 <TableCell>{task.task_description}</TableCell>
                 <TableCell>{task.task_link}</TableCell>
                 <TableCell>{task.task_reward}</TableCell>
@@ -135,7 +195,7 @@ const Task = () => {
                   <IconButtonStyled aria-label="edit" onClick={() => handleOpen(task)}>
                     <EditIcon />
                   </IconButtonStyled>
-                  <IconButtonStyled aria-label="delete">
+                  <IconButtonStyled aria-label="delete" onClick={() => handleDelete(task.id)}>
                     <DeleteIcon />
                   </IconButtonStyled>
                 </TableCell>
@@ -148,12 +208,12 @@ const Task = () => {
       <Modal open={open} onClose={handleClose}>
         <Box sx={modalStyle}>
           <Typography variant="h6" component="h2">
-            {selectedTask ? 'Edit Task' : 'Add Task'}
+            {selectedTask?.id ? 'Görevi Düzenle' : 'Yeni Görev Ekle'}
           </Typography>
           <TextField
             margin="normal"
             fullWidth
-            label="Task Title"
+            label="Görev Başlığı"
             name="task_title"
             value={selectedTask?.task_title || ''}
             onChange={handleChange}
@@ -161,15 +221,7 @@ const Task = () => {
           <TextField
             margin="normal"
             fullWidth
-            label="Task Image"
-            name="task_image"
-            value={selectedTask?.task_image || ''}
-            onChange={handleChange}
-          />
-          <TextField
-            margin="normal"
-            fullWidth
-            label="Task Description"
+            label="Görev Açıklaması"
             name="task_description"
             value={selectedTask?.task_description || ''}
             onChange={handleChange}
@@ -177,7 +229,7 @@ const Task = () => {
           <TextField
             margin="normal"
             fullWidth
-            label="Task Link"
+            label="Görev Bağlantısı"
             name="task_link"
             value={selectedTask?.task_link || ''}
             onChange={handleChange}
@@ -185,14 +237,20 @@ const Task = () => {
           <TextField
             margin="normal"
             fullWidth
-            label="Task Reward"
+            label="Görev Ödülü"
             name="task_reward"
-            type="number"
             value={selectedTask?.task_reward || ''}
             onChange={handleChange}
+            type="number"
+          />
+          <Input
+            type="file"
+            inputProps={{ multiple: true }}
+            onChange={handleImageChange}
+            sx={{ mt: 2 }}
           />
           <Button onClick={handleSave} variant="contained" color="primary" sx={{ mt: 2 }}>
-            Save
+            Kaydet
           </Button>
         </Box>
       </Modal>
